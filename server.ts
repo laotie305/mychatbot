@@ -29,6 +29,38 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
+// Robust resolver to automatically support multiple common naming schemes for custom keys and URLs
+function getCustomApiConfig() {
+  const apiKey = 
+    process.env.CUSTOM_API_KEY || 
+    process.env.OPENAI_API_KEY || 
+    process.env.DEEPSEEK_API_KEY || 
+    process.env.API_KEY || 
+    "";
+
+  const apiUrl = 
+    process.env.CUSTOM_API_URL || 
+    process.env.OPENAI_BASE_URL || 
+    process.env.OPENAI_API_BASE || 
+    process.env.DEEPSEEK_API_BASE || 
+    process.env.API_BASE_URL || 
+    process.env.BASE_URL || 
+    "";
+
+  const apiModel = 
+    process.env.CUSTOM_API_MODEL || 
+    process.env.OPENAI_MODEL || 
+    process.env.DEEPSEEK_MODEL || 
+    process.env.MODEL_NAME || 
+    "";
+
+  return {
+    apiKey: apiKey.trim(),
+    apiUrl: apiUrl.trim(),
+    apiModel: apiModel.trim() || "gpt-4o-mini",
+  };
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -36,15 +68,17 @@ async function startServer() {
   app.use(express.json());
 
   // API check endpoint with full debugging info
+  // API check endpoint with full debugging info
   app.get("/api/health", (req, res) => {
-    const hasCustom = !!(process.env.CUSTOM_API_KEY && process.env.CUSTOM_API_URL);
+    const { apiKey, apiUrl, apiModel } = getCustomApiConfig();
+    const hasCustom = !!(apiKey && apiUrl);
     const hasGemini = !!process.env.GEMINI_API_KEY;
     res.json({
       status: "ok",
       config: {
         hasCustom,
-        customModel: process.env.CUSTOM_API_MODEL || "none",
-        customUrl: process.env.CUSTOM_API_URL || "none",
+        customModel: apiModel,
+        customUrl: apiUrl || "none",
         hasGemini,
       },
     });
@@ -53,13 +87,11 @@ async function startServer() {
   // Diagnostic Test Endpoint to dry-run the custom API and return raw responses
   app.get("/api/test-custom-api", async (req, res) => {
     try {
-      const customApiKey = process.env.CUSTOM_API_KEY;
-      const customApiUrl = process.env.CUSTOM_API_URL;
-      const customApiModel = process.env.CUSTOM_API_MODEL || "agnes-2.0-flash";
+      const { apiKey: customApiKey, apiUrl: customApiUrl, apiModel: customApiModel } = getCustomApiConfig();
 
       if (!customApiKey || !customApiUrl) {
         return res.status(400).json({
-          error: "Custom API is not fully configured in your .env file.",
+          error: "Custom API is not fully configured. Please define API key and base URL in your .env file or settings.",
           envState: {
             hasKey: !!customApiKey,
             hasUrl: !!customApiUrl,
@@ -132,9 +164,7 @@ async function startServer() {
         return res.status(400).json({ error: "Invalid request. 'messages' must be an array." });
       }
 
-      const customApiKey = process.env.CUSTOM_API_KEY;
-      const customApiUrl = process.env.CUSTOM_API_URL;
-      const customApiModel = process.env.CUSTOM_API_MODEL || "gpt-4o-mini";
+      const { apiKey: customApiKey, apiUrl: customApiUrl, apiModel: customApiModel } = getCustomApiConfig();
 
       // If custom API is configured, proxy to it (e.g. OpenAI, DeepSeek, etc.)
       if (customApiKey && customApiUrl) {
