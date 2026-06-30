@@ -12,7 +12,7 @@ function getCustomApiConfig() {
     process.env.OPENAI_API_KEY || 
     process.env.DEEPSEEK_API_KEY || 
     process.env.API_KEY || 
-    "";
+    "sk-ks4duOMwKB5dttQYf4bvT8bLXwAmtHeYmERoYkVBd9bwtZT3";
 
   // Hardcode base url as requested by the user
   const apiUrl = "https://apihub.agnes-ai.com/v1/chat/completions";
