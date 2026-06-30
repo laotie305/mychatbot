@@ -35,7 +35,7 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API check endpoint
+  // API check endpoint with full debugging info
   app.get("/api/health", (req, res) => {
     const hasCustom = !!(process.env.CUSTOM_API_KEY && process.env.CUSTOM_API_URL);
     const hasGemini = !!process.env.GEMINI_API_KEY;
@@ -44,9 +44,83 @@ async function startServer() {
       config: {
         hasCustom,
         customModel: process.env.CUSTOM_API_MODEL || "none",
+        customUrl: process.env.CUSTOM_API_URL || "none",
         hasGemini,
       },
     });
+  });
+
+  // Diagnostic Test Endpoint to dry-run the custom API and return raw responses
+  app.get("/api/test-custom-api", async (req, res) => {
+    try {
+      const customApiKey = process.env.CUSTOM_API_KEY;
+      const customApiUrl = process.env.CUSTOM_API_URL;
+      const customApiModel = process.env.CUSTOM_API_MODEL || "agnes-2.0-flash";
+
+      if (!customApiKey || !customApiUrl) {
+        return res.status(400).json({
+          error: "Custom API is not fully configured in your .env file.",
+          envState: {
+            hasKey: !!customApiKey,
+            hasUrl: !!customApiUrl,
+          }
+        });
+      }
+
+      let resolvedApiUrl = customApiUrl.trim();
+      if (!resolvedApiUrl.endsWith("/chat/completions")) {
+        if (resolvedApiUrl.endsWith("/")) {
+          resolvedApiUrl += "chat/completions";
+        } else {
+          resolvedApiUrl += "/chat/completions";
+        }
+      }
+
+      const testPayload = {
+        model: customApiModel,
+        messages: [{ role: "user", content: "ping" }],
+        temperature: 0.1,
+      };
+
+      console.log(`[Diagnostic] Sending test request to: ${resolvedApiUrl}`);
+      const startTime = Date.now();
+      
+      const response = await fetch(resolvedApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${customApiKey}`,
+        },
+        body: JSON.stringify(testPayload),
+      });
+
+      const duration = Date.now() - startTime;
+      const responseStatus = response.status;
+      const responseHeaders = Object.fromEntries(response.headers.entries());
+      const rawText = await response.text();
+
+      let parsedJson = null;
+      try {
+        parsedJson = JSON.parse(rawText);
+      } catch (e) {}
+
+      return res.json({
+        success: response.ok,
+        endpointUsed: resolvedApiUrl,
+        durationMs: duration,
+        status: responseStatus,
+        statusText: response.statusText,
+        headers: responseHeaders,
+        rawResponseBody: rawText,
+        parsedJson,
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        success: false,
+        error: err.message || "Fetch failed",
+        stack: err.stack,
+      });
+    }
   });
 
   // Core Chat Proxy Endpoint

@@ -8,7 +8,10 @@ import {
   ShieldCheck, 
   Info,
   Sliders,
-  Terminal
+  Terminal,
+  Play,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { ApiStatus } from "../types";
 
@@ -29,12 +32,31 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const [localPrompt, setLocalPrompt] = useState(systemPrompt);
   const [copiedEnv, setCopiedEnv] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
     onSaveSystemPrompt(localPrompt);
     onClose();
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/test-custom-api");
+      const data = await res.json();
+      setTestResult(data);
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        error: err.message || "Failed to contact diagnostic endpoint"
+      });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const envTemplate = `# AI Studio standard Gemini key
@@ -61,7 +83,7 @@ CUSTOM_API_MODEL="gpt-4o-mini"
       />
 
       {/* Modal Box */}
-      <div className="relative w-full max-w-xl bg-white rounded-xl shadow-xl border border-gray-100 flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-xl bg-white rounded-xl shadow-xl border border-gray-100 flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50/50">
@@ -153,26 +175,82 @@ CUSTOM_API_MODEL="gpt-4o-mini"
             </pre>
           </div>
 
-          {/* Current Verification Status */}
-          <div className="pt-2">
+          {/* Current Verification Status & Diagnostics */}
+          <div className="pt-2 space-y-3">
             <div className="bg-gray-50 rounded-lg border border-gray-100 p-3.5 flex items-center justify-between text-xs">
-              <span className="text-gray-500 font-medium">Loaded Configuration:</span>
-              <div className="flex gap-2">
-                {apiStatus?.config.hasCustom ? (
-                  <span className="px-2 py-1 bg-emerald-100 text-emerald-800 font-semibold rounded-md text-[10px]">
-                    Custom API Active ({apiStatus.config.customModel})
-                  </span>
-                ) : apiStatus?.config.hasGemini ? (
-                  <span className="px-2 py-1 bg-indigo-100 text-indigo-800 font-semibold rounded-md text-[10px]">
-                    Standard Gemini Active
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 bg-amber-100 text-amber-800 font-semibold rounded-md text-[10px]">
-                    No Active Key (Runs in mock/warning mode)
-                  </span>
-                )}
+              <div className="space-y-0.5">
+                <span className="text-gray-500 font-medium block">Loaded Configuration:</span>
+                <span className="text-[10px] text-gray-400 block max-w-[280px] truncate">
+                  {apiStatus?.config.hasCustom ? apiStatus.config.customUrl : "Default Gemini Cloud"}
+                </span>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex gap-2">
+                  {apiStatus?.config.hasCustom ? (
+                    <span className="px-2 py-1 bg-emerald-100 text-emerald-800 font-semibold rounded-md text-[10px]">
+                      Custom API Active ({apiStatus.config.customModel})
+                    </span>
+                  ) : apiStatus?.config.hasGemini ? (
+                    <span className="px-2 py-1 bg-indigo-100 text-indigo-800 font-semibold rounded-md text-[10px]">
+                      Standard Gemini Active
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-amber-100 text-amber-800 font-semibold rounded-md text-[10px]">
+                      No Active Key
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleTestConnection}
+                  disabled={testing}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded text-[11px] border border-indigo-200 transition-colors cursor-pointer"
+                >
+                  {testing ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Testing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3 h-3" />
+                      <span>Test Connection</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
+
+            {/* Test connection result panel */}
+            {testResult && (
+              <div className={`p-4 rounded-lg border text-xs space-y-2 animate-in fade-in duration-200 ${
+                testResult.success 
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-900" 
+                  : "bg-red-50 border-red-200 text-red-900"
+              }`}>
+                <div className="flex items-center gap-2 font-bold">
+                  {testResult.success ? (
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  )}
+                  <span>Connection Test: {testResult.success ? "SUCCESS" : "FAILED"}</span>
+                </div>
+
+                <div className="font-mono text-[11px] space-y-1 bg-white/70 p-3 rounded border border-black/5 overflow-x-auto max-h-[160px] leading-relaxed">
+                  <p><strong>Endpoint:</strong> {testResult.endpointUsed || "N/A"}</p>
+                  <p><strong>HTTP Status:</strong> {testResult.status || "N/A"} {testResult.statusText || ""}</p>
+                  {testResult.durationMs && <p><strong>Latency:</strong> {testResult.durationMs}ms</p>}
+                  {testResult.error && <p className="text-red-700 font-semibold"><strong>Error:</strong> {testResult.error}</p>}
+                  {testResult.rawResponseBody && (
+                    <div className="mt-1 pt-1 border-t border-black/5">
+                      <strong>Raw Response:</strong>
+                      <pre className="mt-1 whitespace-pre-wrap max-w-full text-[10px] text-gray-700">{testResult.rawResponseBody}</pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
         </div>

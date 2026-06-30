@@ -19,6 +19,7 @@ export interface ApiStatus {
   config: {
     hasCustom: boolean;
     customModel: string;
+    customUrl?: string;
     hasGemini: boolean;
   };
 }
