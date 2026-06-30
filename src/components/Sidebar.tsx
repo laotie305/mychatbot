@@ -201,11 +201,6 @@ export function Sidebar({
                     Active: {apiStatus.config.customModel}
                   </span>
                 </div>
-              ) : apiStatus.config.hasGemini ? (
-                <div className="flex items-center gap-1.5 text-xs text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
-                  <CloudLightning className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  <span className="truncate font-medium">Active: Gemini (Default)</span>
-                </div>
               ) : (
                 <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-100">
                   <span className="font-semibold text-amber-600">⚠ No Key Configured</span>

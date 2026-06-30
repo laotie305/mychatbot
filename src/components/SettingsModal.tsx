@@ -47,6 +47,21 @@ export function SettingsModal({
     setTestResult(null);
     try {
       const res = await fetch("/api/test-custom-api");
+      
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        setTestResult({
+          success: false,
+          endpointUsed: "/api/test-custom-api",
+          status: res.status,
+          statusText: res.statusText,
+          error: `The server returned an HTML/text response instead of JSON. The backend server might still be booting up or restarting. Please wait 10-15 seconds and try again!`,
+          rawResponseBody: text.substring(0, 1000)
+        });
+        return;
+      }
+
       const data = await res.json();
       setTestResult(data);
     } catch (err: any) {
@@ -59,13 +74,9 @@ export function SettingsModal({
     }
   };
 
-  const envTemplate = `# AI Studio standard Gemini key
-GEMINI_API_KEY="YOUR_GEMINI_API_KEY_HERE"
-
-# OPTIONAL Custom API config (To override standard Gemini)
+  const envTemplate = `# Custom API configuration
+# Place your secure API key here. The application connects directly to Agnes AI.
 CUSTOM_API_KEY="YOUR_CUSTOM_API_KEY_HERE"
-CUSTOM_API_URL="https://api.openai.com/v1/chat/completions"
-CUSTOM_API_MODEL="gpt-4o-mini"
 `;
 
   const copyEnvTemplate = () => {
@@ -165,9 +176,7 @@ CUSTOM_API_MODEL="gpt-4o-mini"
             </div>
             
             <p className="text-xs text-gray-500">
-              You can set up either the standard Gemini key or direct the server to your custom, 
-              OpenAI-compatible endpoints (e.g. DeepSeek, custom gateways) by adding these to your 
-              local <code>.env</code> file:
+              Set up your custom API key by adding it to your local <code>.env</code> file:
             </p>
 
             <pre className="p-3.5 bg-gray-900 text-gray-100 rounded-lg text-[11px] font-mono leading-relaxed overflow-x-auto border border-gray-800">
@@ -181,18 +190,14 @@ CUSTOM_API_MODEL="gpt-4o-mini"
               <div className="space-y-0.5">
                 <span className="text-gray-500 font-medium block">Loaded Configuration:</span>
                 <span className="text-[10px] text-gray-400 block max-w-[280px] truncate">
-                  {apiStatus?.config.hasCustom ? apiStatus.config.customUrl : "Default Gemini Cloud"}
+                  {apiStatus?.config.hasCustom ? "Agnes AI (Secure Proxy)" : "No Active Key"}
                 </span>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <div className="flex gap-2">
                   {apiStatus?.config.hasCustom ? (
                     <span className="px-2 py-1 bg-emerald-100 text-emerald-800 font-semibold rounded-md text-[10px]">
-                      Custom API Active ({apiStatus.config.customModel})
-                    </span>
-                  ) : apiStatus?.config.hasGemini ? (
-                    <span className="px-2 py-1 bg-indigo-100 text-indigo-800 font-semibold rounded-md text-[10px]">
-                      Standard Gemini Active
+                      Active Key ({apiStatus.config.customModel})
                     </span>
                   ) : (
                     <span className="px-2 py-1 bg-amber-100 text-amber-800 font-semibold rounded-md text-[10px]">
